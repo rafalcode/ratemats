@@ -11,6 +11,8 @@ GSL_LIBS=-lgsl -lgslcblas -lm
 # so this will generate no graphics
 ratematn: ratematn.c
 	@${CC} ${CFLAGS} -o $@ $^ -DUNPREDRA -lm
+ratematn_d: ratematn.c
+	@${CC} ${CFLAGS} -DDBG -o $@ $^ -DUNPREDRA -lm
 
 .PHONY: clean
 
