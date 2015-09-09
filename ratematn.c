@@ -292,7 +292,7 @@ void sitesubproc(sitedef* sites, float *ar, int nstates, int numsites, char symb
     srand(rsee);
     base currba;
     for(i=0;i<numsites;++i) {
-        sites[i].latestb = sites[i].brec[0] = symb;
+        sites[i].brec[0] = sites[i].latestb;
         while(1) {
             ura= (float)rand()/RAND_MAX;
             currba = sites[i].latestb;
@@ -369,6 +369,7 @@ int main(int argc, char *argv[])
     int numsites=atoi(argv[2]);
 
     sitedef *sitearr=crea_sd(numsites);
+
     sitesubproc(sitearr, mat, nstates, numsites, 'G', lenc, rsee);
     summarysites(sitearr, numsites, nstates, "Final dist: ex() = -1/-rate log1p(-ura)");
 
