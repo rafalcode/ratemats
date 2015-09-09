@@ -24,7 +24,7 @@ typedef enum /*  simple enum to hold our four bases */
 
 typedef struct /* our definition of a site is a struct */
 {
-    int currp; /* curr num of jumps: also uses as index to posarr[] */
+    int currp; /* curr num of jumps: also uses as index to posarr[], i.e. gives the size of posarr */
     int jbf; /* buffer allow for jumps */
     float mxdisp; /* current maximum displacement */
     float *posarr; /* the array of position values: to be a cumulative */
@@ -161,6 +161,20 @@ float *processinpf(char *fname, int *m, int *n)
     return mat;
 }
 
+sitedef *crea_sd(int numsites)
+{
+    int i;
+    sitedef *sitearr=malloc(sizeof(sitedef) * numsites);
+    for(i=0;i<numsites;++i) {
+        sitearr[i].mxdisp=0.0;
+        sitearr[i].currp=0;
+        sitearr[i].jbf=BUF;
+        sitearr[i].posarr=calloc(sizeof(float), sitearr[i].jbf);
+        sitearr[i].brec=calloc(sizeof(base), sitearr[i].jbf);
+    }
+    return sitearr;
+}
+
 int *memind(int n) /* return an n x n-1 matrix of indices which exclude the diags */
 {
     /* build our excluding-diag-index array first */
@@ -205,10 +219,48 @@ float *mat2cum(float *arr, int n, int *excind)
     return cumarr;
 }
 
-void sitesubproc(sitedef* sites, float *ar, int nstates, int numsites, char symb, float lenc, int rsee)
+void summarysites(sitedef *sitearr, int numsites, int nstates, char *idstrng)
 {
     int i;
-    /* what's the starting symbol? */
+    int *nucrec=calloc(sizeof(int), nstates);
+    for(i=0;i<numsites;++i)
+        switch(sitearr[i].endsymb) {
+            case 'A':
+                nucrec[0]++; break;
+            case 'C':
+                nucrec[1]++; break;
+            case 'G':
+                nucrec[2]++; break;
+            case 'T':
+                nucrec[3]++; break;
+        }
+
+    float avgnj=.0;
+    for(i=0;i<numsites;++i) {
+        avgnj+=sitearr[i].currp-1; /* why -1? the first currp is not a change, it's the initial state */
+#ifdef DBG
+        int j;
+        printf("site:%3d pos) ", i); 
+        for(j=0;j<sitearr[i].currp;++j) 
+            printf("%.4f ", sitearr[i].posarr[j]); 
+        printf("\n"); 
+#endif
+    }
+    avgnj /=numsites;
+    printf("%s.. avg #jumps %.2f:\n", idstrng, avgnj); 
+    for(i=0;i<nstates;++i) 
+        printf("%6i ",nucrec[i]); 
+    printf("\n"); 
+    for(i=0;i<nstates;++i) 
+        printf("%3.4f ",(float)nucrec[i]/numsites); 
+    printf("\n"); 
+    free(nucrec);
+}
+
+void sitesubproc0(sitedef* sites, float *ar, int nstates, int numsites, char symb, float lenc, int rsee)
+{
+    int i;
+    /* what's the starting symbol? All sites given the same one */
     for(i=0;i<numsites;++i) {
         switch (symb) {
             case 'A':
@@ -234,16 +286,88 @@ void sitesubproc(sitedef* sites, float *ar, int nstates, int numsites, char symb
     float *nsf = mat2cum(ar, nstates, excind); /* an array to hold the off diagonal entries, divided by the diagonal entry, all made negative */
 
     float ura; /*  variable to hold one uniform random variable 0-1 */
+    srand(rsee);
     base currba;
     for(i=0;i<numsites;++i) {
         sites[i].latestb = sites[i].brec[0] = G;
         while(1) { /* infinite loop to be broken out of when maxlen reaches a certain condition */
             ura= (float)rand()/RAND_MAX;
             currba = sites[i].latestb;
-            //            printf("currba: %u\n",currba);
-            /*  armed with our ura, we can generate the Exp() */
             sites[i].posarr[sites[i].currp + 1] = sites[i].posarr[sites[i].currp] + (-1.0/ar[4*currba+currba])*log(1+ura); 
-            // sites[i].posarr[sites[i].currp + 1] = sites[i].posarr[sites[i].currp] + (-1.0/-ar[4*currba+currba])*log1p(-ura); 
+            sites[i].brec[sites[i].currp + 1] = getnextrbase(nsf + 4*currba, 4, excind, currba);  /* note: just a single row of nsf is "sent up" */
+
+            sites[i].latestb = sites[i].brec[sites[i].currp + 1];
+            sites[i].mxdisp = sites[i].posarr[sites[i].currp + 1];
+
+            sites[i].currp++;
+            /* check posarr buf sz */
+            if(sites[i].currp==sites[i].jbf-1) {
+                sites[i].jbf += BUF;
+                sites[i].posarr=realloc(sites[i].posarr, sites[i].jbf * sizeof(float));
+                memset(sites[i].posarr+sites[i].jbf-BUF, 0, BUF*sizeof(float));
+                sites[i].brec=realloc(sites[i].brec, sites[i].jbf * sizeof(base));
+                memset(sites[i].brec+sites[i].jbf-BUF, 0, BUF*sizeof(base));
+            }
+            /*  breaking out when condition met */
+            if(sites[i].mxdisp >= lenc)
+                break; /*  this site has now crossed finishing line, go to next site*/
+        }
+        /*  rationalise posarr array size here */
+        sites[i].posarr=realloc(sites[i].posarr, sites[i].currp * sizeof(float));
+        sites[i].brec=realloc(sites[i].brec, sites[i].currp * sizeof(base));
+        /*  FInd out at what symbol site finished at */
+        switch(sites[i].brec[sites[i].currp-1]) {
+            case 0:
+                sites[i].endsymb='A'; break;
+            case 1:
+                sites[i].endsymb='C'; break;
+            case 2:
+                sites[i].endsymb='G'; break;
+            case 3:
+                sites[i].endsymb='T'; break;
+        }
+    }
+    free(nsf);
+    free(excind);
+}
+
+void sitesubproc2(sitedef* sites, float *ar, int nstates, int numsites, char symb, float lenc, int rsee)
+{
+    int i;
+    /* what's the starting symbol? All sites given the same one */
+    for(i=0;i<numsites;++i) {
+        switch (symb) {
+            case 'A':
+                sites[i].latestb=A; /*  */
+                sites[i].starsymb='A'; /*  */
+                break;
+            case 'C':
+                sites[i].latestb=C; /*  */
+                sites[i].starsymb='C'; /*  */
+                break;
+            case 'G':
+                sites[i].latestb=G; /*  */
+                sites[i].starsymb='G'; /*  */
+                break;
+            case 'T':
+                sites[i].latestb=T; /*  */
+                sites[i].starsymb='T'; /*  */
+                break;
+        }
+    }
+
+    int *excind=memind(nstates); /* a matrix of indices will be 4 rows by 3 columns */
+    float *nsf = mat2cum(ar, nstates, excind); /* an array to hold the off diagonal entries, divided by the diagonal entry, all made negative */
+
+    float ura; /*  variable to hold one uniform random variable 0-1 */
+    srand(rsee);
+    base currba;
+    for(i=0;i<numsites;++i) {
+        sites[i].latestb = sites[i].brec[0] = G;
+        while(1) {
+            ura= (float)rand()/RAND_MAX;
+            currba = sites[i].latestb;
+            sites[i].posarr[sites[i].currp + 1] = sites[i].posarr[sites[i].currp] + (-1.0/-ar[4*currba+currba])*log1p(-ura); 
             sites[i].brec[sites[i].currp + 1] = getnextrbase(nsf + 4*currba, 4, excind, currba);  /* note: just a single row of nsf is "sent up" */
 
             sites[i].latestb = sites[i].brec[sites[i].currp + 1];
@@ -296,6 +420,7 @@ int main(int argc, char *argv[])
     } else
         rsee=atoi(argv[4]);
     lenc=atof(argv[3]);
+    printf("rsee=%d\n", rsee); 
 
     float *mat=processinpf(argv[1], &nstates, &ncols);
     if(nstates!=ncols) {
@@ -303,6 +428,7 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 #ifdef DBG
+    int j;
     for(i=0;i<nstates;++i) {
         for(j=0;j<nstates;++j) 
             printf("%f ", mat[i*nstates+j]);
@@ -311,47 +437,30 @@ int main(int argc, char *argv[])
 #endif
     int numsites=atoi(argv[2]);
 
-    sitedef* sitearr; /*  declare */
-    /* now, initialise */
-    sitearr=malloc(sizeof(sitedef) * numsites);
-    for(i=0;i<numsites;++i) {
-        sitearr[i].mxdisp=0.0;
-        sitearr[i].currp=0;
-        sitearr[i].jbf=BUF;
-        sitearr[i].posarr=calloc(sizeof(float), sitearr[i].jbf);
-        sitearr[i].brec=calloc(sizeof(base), sitearr[i].jbf);
-    }
+    sitedef *sitearr=crea_sd(numsites);
 
-    /*  OK, the race takes place here: */
-    sitesubproc(sitearr, mat, nstates, numsites, 'G', lenc, rsee);
-
-    int *nucrec=calloc(sizeof(int), nstates);
-    for(i=0;i<numsites;++i)
-        switch(sitearr[i].endsymb) {
-            case 'A':
-                nucrec[0]++; break;
-            case 'C':
-                nucrec[1]++; break;
-            case 'G':
-                nucrec[2]++; break;
-            case 'T':
-                nucrec[3]++; break;
-        }
-
-    printf("Final Distribution:\n"); 
-    for(i=0;i<nstates;++i) 
-        printf("%6i ",nucrec[i]); 
-    printf("\n"); 
-    for(i=0;i<nstates;++i) 
-        printf("%3.4f ",(float)nucrec[i]/numsites); 
-    printf("\n"); 
+    /* OK, firstthe race takes place here: */
+    sitesubproc0(sitearr, mat, nstates, numsites, 'G', lenc, rsee);
+    summarysites(sitearr, numsites, nstates, "Final dist: -1/rate log1p(ura)");
 
     for(i=0;i<numsites;++i) {
         free(sitearr[i].posarr);
         free(sitearr[i].brec);
     }
     free(sitearr);
-    free(nucrec);
+
+    /* Second pass through second formula */
+    sitearr=crea_sd(numsites);
+
+    /* OK, firstthe race takes place here: */
+    sitesubproc2(sitearr, mat, nstates, numsites, 'G', lenc, rsee);
+    summarysites(sitearr, numsites, nstates, "Final dist: -1/-rate log1p(-ura)");
+
+    for(i=0;i<numsites;++i) {
+        free(sitearr[i].posarr);
+        free(sitearr[i].brec);
+    }
+    free(sitearr);
     free(mat);
     return 0;
 }
