@@ -1,8 +1,9 @@
 # Programs for subsitution rate matrices
+# Mne: RATEMAT, an "n" after means numbers only.
 #
 CC=gcc
 CFLAGS=-g -Wall# -pg # note the gprof option
-EXES=ratematn
+EXES=ratematn ratematn_d bratematn bratematn_d
 SPECLIBS=-lcairo
 GSL_LIBS=-lgsl -lgslcblas -lm
 
@@ -10,9 +11,22 @@ GSL_LIBS=-lgsl -lgslcblas -lm
 # the n at the end implies numbers. It's to check validity
 # so this will generate no graphics
 ratematn: ratematn.c
-	@${CC} ${CFLAGS} -o $@ $^ -DUNPREDRA -lm
+	@${CC} ${CFLAGS} -o $@ $^ -lm
 ratematn_d: ratematn.c
-	@${CC} ${CFLAGS} -DDBG -o $@ $^ -DUNPREDRA -lm
+	@${CC} ${CFLAGS} -DDBG -o $@ $^ -lm
+
+# binary case, only two symbols ... and, DISCRETE VERSION
+bratematn: bratematn.c
+	@${CC} ${CFLAGS} -o $@ $^ -lm
+bratematn_d: bratematn.c
+	@${CC} ${CFLAGS} -DDBG -o $@ $^ -lm
+
+# proto version
+# actually for comparing different "wrong" versions of the exponential waiting time
+ratematproto: ratematproto.c
+	@${CC} ${CFLAGS} -o $@ $^ -lm
+ratematproto_d: ratematproto.c
+	@${CC} ${CFLAGS} -DDBG -o $@ $^ -lm
 
 .PHONY: clean
 

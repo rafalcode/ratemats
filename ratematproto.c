@@ -13,15 +13,11 @@
 #define GBUF 8
 #define WBUF 8
 
-unsigned mconsump=0; /* memory consumption: global for memory accounting */
-
 typedef unsigned char boole;
 typedef enum /*  simple enum to hold our four bases */
 {
     A,
-    C,
-    G,
-    T
+    B
 } base;
 
 typedef struct /* our definition of a site is a struct */
@@ -167,7 +163,6 @@ sitedef *crea_sd(int numsites)
 {
     int i;
     sitedef *sitearr=malloc(sizeof(sitedef) * numsites);
-    mconsump += (sizeof(sitedef) * numsites);
     for(i=0;i<numsites;++i) {
         sitearr[i].mxdisp=0.0;
         sitearr[i].currp=0;
@@ -230,12 +225,8 @@ void summarysites(sitedef *sitearr, int numsites, int nstates, char *idstrng)
         switch(sitearr[i].endsymb) {
             case 'A':
                 nucrec[0]++; break;
-            case 'C':
+            case 'B':
                 nucrec[1]++; break;
-            case 'G':
-                nucrec[2]++; break;
-            case 'T':
-                nucrec[3]++; break;
         }
 
     float avgnj=.0;
@@ -270,17 +261,9 @@ void sitesubproc(sitedef* sites, float *ar, int nstates, int numsites, char symb
                 sites[i].latestb=A; /*  */
                 sites[i].starsymb='A'; /*  */
                 break;
-            case 'C':
-                sites[i].latestb=C; /*  */
-                sites[i].starsymb='C'; /*  */
-                break;
-            case 'G':
-                sites[i].latestb=G; /*  */
-                sites[i].starsymb='G'; /*  */
-                break;
-            case 'T':
-                sites[i].latestb=T; /*  */
-                sites[i].starsymb='T'; /*  */
+            case 'B':
+                sites[i].latestb=B; /*  */
+                sites[i].starsymb='B'; /*  */
                 break;
         }
     }
@@ -292,12 +275,12 @@ void sitesubproc(sitedef* sites, float *ar, int nstates, int numsites, char symb
     srand(rsee);
     base currba;
     for(i=0;i<numsites;++i) {
-        sites[i].latestb = sites[i].brec[0] = symb;
-        while(1) {
+        sites[i].latestb = sites[i].brec[0] = A;
+        while(1) { /* infinite loop to be broken out of when maxlen reaches a certain condition */
             ura= (float)rand()/RAND_MAX;
             currba = sites[i].latestb;
             sites[i].posarr[sites[i].currp + 1] = sites[i].posarr[sites[i].currp] + (-1.0/-ar[4*currba+currba])*log1p(-ura); 
-            sites[i].brec[sites[i].currp + 1] = getnextrbase(nsf + 4*currba, 4, excind, currba);  /* note: just a single row of nsf is "sent up" */
+            sites[i].brec[sites[i].currp + 1] = getnextrbase(nsf + nstates*currba, nstates, excind, currba);
 
             sites[i].latestb = sites[i].brec[sites[i].currp + 1];
             sites[i].mxdisp = sites[i].posarr[sites[i].currp + 1];
@@ -317,19 +300,13 @@ void sitesubproc(sitedef* sites, float *ar, int nstates, int numsites, char symb
         }
         /*  rationalise posarr array size here */
         sites[i].posarr=realloc(sites[i].posarr, sites[i].currp * sizeof(float));
-        mconsump += sites[i].currp * sizeof(float);
         sites[i].brec=realloc(sites[i].brec, sites[i].currp * sizeof(base));
-        mconsump += sites[i].currp * sizeof(base);
         /*  FInd out at what symbol site finished at */
         switch(sites[i].brec[sites[i].currp-1]) {
             case 0:
                 sites[i].endsymb='A'; break;
             case 1:
-                sites[i].endsymb='C'; break;
-            case 2:
-                sites[i].endsymb='G'; break;
-            case 3:
-                sites[i].endsymb='T'; break;
+                sites[i].endsymb='B'; break;
         }
     }
     free(nsf);
@@ -370,7 +347,7 @@ int main(int argc, char *argv[])
 
     sitedef *sitearr=crea_sd(numsites);
     sitesubproc(sitearr, mat, nstates, numsites, 'G', lenc, rsee);
-    summarysites(sitearr, numsites, nstates, "Final dist: ex() = -1/-rate log1p(-ura)");
+    summarysites(sitearr, numsites, nstates, "Final dist: -1/rate log1p(ura)");
 
     for(i=0;i<numsites;++i) {
         free(sitearr[i].posarr);
@@ -378,6 +355,5 @@ int main(int argc, char *argv[])
     }
     free(sitearr);
     free(mat);
-    printf("mconsump= %u.\n", mconsump); 
     return 0;
 }
