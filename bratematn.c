@@ -14,7 +14,7 @@
 #define WBUF 8
 
 typedef unsigned char boole;
-typedef enum /*  simple enum to hold our four bases */
+typedef enum /*  simple enum to hold our two bases */
 {
     A,
     B
@@ -173,50 +173,6 @@ sitedef *crea_sd(int numsites)
     return sitearr;
 }
 
-int *memind(int n) /* return an n x n-1 matrix of indices which exclude the diags */
-{
-    /* build our excluding-diag-index array first */
-    int i, j, k, m, l=0;
-    int *excind = calloc(n*(n-1), sizeof(int));
-
-    for(i=0;i<n;++i)
-        for(j=0;j<n;++j) { 
-            k=n*i+j;
-            m=k%n;
-            if(k!=i*n+i)
-                excind[l++] = m; 
-        } /* excind is built */
-    return excind;
-}
-
-base getnextrbase(float *nsf, int n, int *excind, base sta) /* get our next random base */
-{
-    int i;
-    base retbase;
-
-    float r= (float)rand()/RAND_MAX * nsf[n-1]; /* multiplied by final entry in nsf .... therefore stretched, so to speak */
-
-    for(i=0;i<n-1;++i)
-        if(r<nsf[i+1]) { /* shouldn't this be if(r<nsf[sta*(n-1)+i+1])? nipe just one row */
-            retbase = (base) excind[sta*(n-1) + i]; 
-            break;
-        }
-    return retbase;
-}
-
-float *mat2cum(float *arr, int n, int *excind)
-{
-    int i, j; /* note cumulative array will calculate second values onward */
-
-    float *cumarr;
-    cumarr=calloc(n*n, sizeof(float)); 
-    for(i=0;i<n;++i)
-        for(j=1;j<n;++j)
-            cumarr[n*i+j] = cumarr[n*i+j-1] + (arr[i*n+excind[i*(n-1) +j-1]] / -arr[i*n + i]);
-
-    return cumarr;
-}
-
 void summarysites(sitedef *sitearr, int numsites, int nstates, char *idstrng)
 {
     int i;
@@ -268,9 +224,6 @@ void sitesubproc(sitedef* sites, float *ar, int nstates, int numsites, char symb
         }
     }
 
-    int *excind=memind(nstates); /* a matrix of indices will be 4 rows by 3 columns */
-    float *nsf = mat2cum(ar, nstates, excind); /* an array to hold the off diagonal entries, divided by the diagonal entry, all made negative */
-
     float ura; /*  variable to hold one uniform random variable 0-1 */
     srand(rsee);
     base currba;
@@ -279,8 +232,8 @@ void sitesubproc(sitedef* sites, float *ar, int nstates, int numsites, char symb
         while(1) { /* infinite loop to be broken out of when maxlen reaches a certain condition */
             ura= (float)rand()/RAND_MAX;
             currba = sites[i].latestb;
-            sites[i].posarr[sites[i].currp + 1] = sites[i].posarr[sites[i].currp] + (-1.0/-ar[4*currba+currba])*log1p(-ura); 
-            sites[i].brec[sites[i].currp + 1] = getnextrbase(nsf + nstates*currba, nstates, excind, currba);
+            sites[i].posarr[sites[i].currp + 1] = sites[i].posarr[sites[i].currp] + (-1.0/-ar[nstates*currba+currba])*log1p(-ura); 
+            sites[i].brec[sites[i].currp + 1] = (currba==A)? B : A;
 
             sites[i].latestb = sites[i].brec[sites[i].currp + 1];
             sites[i].mxdisp = sites[i].posarr[sites[i].currp + 1];
@@ -309,8 +262,6 @@ void sitesubproc(sitedef* sites, float *ar, int nstates, int numsites, char symb
                 sites[i].endsymb='B'; break;
         }
     }
-    free(nsf);
-    free(excind);
 }
 
 int main(int argc, char *argv[])
@@ -346,8 +297,8 @@ int main(int argc, char *argv[])
     int numsites=atoi(argv[2]);
 
     sitedef *sitearr=crea_sd(numsites);
-    sitesubproc(sitearr, mat, nstates, numsites, 'G', lenc, rsee);
-    summarysites(sitearr, numsites, nstates, "Final dist: -1/rate log1p(ura)");
+    sitesubproc(sitearr, mat, nstates, numsites, 'A', lenc, rsee);
+    summarysites(sitearr, numsites, nstates, "Final dist: -1/-rate log1p(-ura)");
 
     for(i=0;i<numsites;++i) {
         free(sitearr[i].posarr);
