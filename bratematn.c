@@ -37,7 +37,8 @@ void usage(void)
     printf("Usage. Pls supply 3 or 4 arguments:\n");
     printf("\t1) name of text file with matrix.\n");
     printf("\t2) number of sites.\n");
-    printf("\t3) branch length limit, i.e. duration of simulation: 0.1 is small, 10 big, 1000 very big.\n");
+    printf("\t3) number of minimum extent units. The smallest substrate by average will occur once per 1 extent unit,\n");
+   printf("\twhich is an int, not a float.\n");
     printf("\t4) (optional, if not supplied, a random seed will be generated) specified random number seed.\n");
 }
 
@@ -68,6 +69,21 @@ void free_wseq(wseq_t *wa)
     free(wa->wln);
     free(wa->wpla);
     free(wa);
+}
+
+
+int maxextent(float *mat, int nstates) /* will return max extent for which the smallest element in mat is a one */
+{
+    int i;
+    float min=9999999.0, tn;
+    int n2=nstates*nstates;
+    for(i=0;i<n2;++i) {
+        tn=(mat[i]<0)? -mat[i] : mat[i];
+        if(min>tn)
+            min=tn;
+    }
+
+    return (int)(1./min+.5);
 }
 
 float *processinpf(char *fname, int *m, int *n)
@@ -278,7 +294,6 @@ int main(int argc, char *argv[])
         rsee=(int)((tnow.tv_usec/100000.0 - tnow.tv_usec/100000)*RAND_MAX);
     } else
         rsee=atoi(argv[4]);
-    lenc=atof(argv[3]);
     printf("rsee=%d\n", rsee); 
 
     float *mat=processinpf(argv[1], &nstates, &ncols);
@@ -286,8 +301,12 @@ int main(int argc, char *argv[])
         printf("Error: only square matrices accepted.\n"); 
         exit(EXIT_FAILURE);
     }
+    int mxtent=maxextent(mat, nstates); /* gives us the minimum unit (of time, usually) where everything shoudl happen at least once */
+    lenc=atof(argv[3])*mxtent;
+
 #ifdef DBG
     int j;
+    printf("mxtent:%d\n", mxtent); 
     for(i=0;i<nstates;++i) {
         for(j=0;j<nstates;++j) 
             printf("%f ", mat[i*nstates+j]);
