@@ -13,6 +13,8 @@
 #define GBUF 8
 #define WBUF 8
 
+#define HCNSTATES 2
+
 typedef unsigned char boole;
 
 typedef struct /* r_t, rate type: convenience struct for the two rates and the mxextent */
@@ -53,7 +55,7 @@ void usage(char *progname)
 
 r_t *fill_rt(char *s1, char *s2);
 {
-   r_t rts=malloc(sizeof(r_t));
+   r_t *rts=malloc(sizeof(r_t));
    int n, d1=0, d2=0;
    char *tstr;
    char ttstr[32]={0};
@@ -88,24 +90,18 @@ r_t *fill_rt(char *s1, char *s2);
        strcpy(ttstr, tstr+1);
        d2=atoi(ttstr);
        rts->s2r=(float)n/d2;
-       rts->mxt=(d1>d2)? d1:d2;
    }
 
+   int mxt2=(int)(.5+1./min);
+   if( d1 & d2) 
+       rts->mxt=(d1>d2)? d1:d2;
+   else if( (d1 & (d2==0) ) | (d2 & (d1==0) ) )
+       if(rts->mxt < mxt2)
+           rts->mxt = mxt2;
+   else
+       rts->mxt=mxt2;
+
     return rts;
-
-
-
-
-    int i;
-    float min=9999999.0, tn;
-    int n2=nstates*nstates;
-    for(i=0;i<n2;++i) {
-        tn=(mat[i]<0)? -mat[i] : mat[i];
-        if(min>tn)
-            min=tn;
-    }
-
-    return (int)(1./min+.5);
 }
 
 sitedef *crea_sd(int numsites)
@@ -156,7 +152,7 @@ void summarysites(sitedef *sitearr, int numsites, int nstates, char *idstrng)
     free(nucrec);
 }
 
-void sitesubproc(sitedef* sites, float *ar, int nstates, int numsites, char symb, float lenc, int rsee)
+void sitesubproc(sitedef* sites, r_t *rts, int nstates, int numsites, char symb, float lenc, int rsee)
 {
     int i;
     /* what's the starting symbol? All sites given the same one */
@@ -176,13 +172,20 @@ void sitesubproc(sitedef* sites, float *ar, int nstates, int numsites, char symb
     float ura; /*  variable to hold one uniform random variable 0-1 */
     srand(rsee);
     base currba;
+    float srate;
     for(i=0;i<numsites;++i) {
         sites[i].latestb = sites[i].brec[0] = A;
         while(1) { /* infinite loop to be broken out of when maxlen reaches a certain condition */
             ura= (float)rand()/RAND_MAX;
             currba = sites[i].latestb;
-            sites[i].posarr[sites[i].currp + 1] = sites[i].posarr[sites[i].currp] + (-1.0/-ar[nstates*currba+currba])*log1p(-ura); 
-            sites[i].brec[sites[i].currp + 1] = (currba==A)? B : A;
+            if(currba==A) {
+            sites[i].brec[sites[i].currp + 1] = B;
+            srate=rts->s1r;
+            } else {
+            sites[i].brec[sites[i].currp + 1] = A;
+            srate=rts->s2r;
+            }
+            sites[i].posarr[sites[i].currp + 1] = sites[i].posarr[sites[i].currp] + (-1.0/srate)*log1p(-ura); 
 
             sites[i].latestb = sites[i].brec[sites[i].currp + 1];
             sites[i].mxdisp = sites[i].posarr[sites[i].currp + 1];
@@ -215,41 +218,38 @@ void sitesubproc(sitedef* sites, float *ar, int nstates, int numsites, char symb
 
 int main(int argc, char *argv[])
 {
-    int i, nstates, ncols, rsee;
-    float lenc;
+    int i, rsee;
     /* argument accounting */
     if((argc!=6) & (argc!=5)) {
         usage(argv[0]);
         exit(EXIT_FAILURE);
-    } else if (argc==4) { /* no seed given, use a random one */
+    } else if (argc==5) { /* no seed given, use a random one */
         struct timeval tnow;
         gettimeofday(&tnow, NULL);
         rsee=(int)((tnow.tv_usec/100000.0 - tnow.tv_usec/100000)*RAND_MAX);
     } else
-        rsee=atoi(argv[4]);
+        rsee=atoi(argv[5]);
     printf("rsee=%d\n", rsee); 
 
-    float *mat=processinpf(argv[1], &nstates, &ncols);
-    if(nstates!=ncols) {
-        printf("Error: only square matrices accepted.\n"); 
-        exit(EXIT_FAILURE);
-    }
-    int mxtent=maxextent(mat, nstates); /* gives us the minimum unit (of time, usually) where everything shoudl happen at least once */
-    lenc=atof(argv[3])*mxtent;
+    nstates=HCNSTATES;
+    r_t *rts=fill_rt(argv[1], argv[2]);
+#ifdef
+    printf("rts: %.4f %.4f %d\n", rts->s1r, rts->s2r, rts->mxt); 
+#endif
+    int numsites=atoi(argv[3]);
+    int lenc=atoi(argv[4])*rts->mxt;
 
 #ifdef DBG
     int j;
-    printf("mxtent:%d\n", mxtent); 
     for(i=0;i<nstates;++i) {
         for(j=0;j<nstates;++j) 
             printf("%f ", mat[i*nstates+j]);
         printf("\n"); 
     }
 #endif
-    int numsites=atoi(argv[2]);
 
     sitedef *sitearr=crea_sd(numsites);
-    sitesubproc(sitearr, mat, nstates, numsites, 'A', lenc, rsee);
+    sitesubproc(sitearr, rts, nstates, numsites, 'A', lenc, rsee);
     summarysites(sitearr, numsites, nstates, "Final dist: -1/-rate log1p(-ura)");
 
     for(i=0;i<numsites;++i) {
@@ -257,6 +257,6 @@ int main(int argc, char *argv[])
         free(sitearr[i].brec);
     }
     free(sitearr);
-    free(mat);
+    free(rts);
     return 0;
 }

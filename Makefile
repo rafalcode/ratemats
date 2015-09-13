@@ -15,10 +15,15 @@ ratematn: ratematn.c
 ratematn_d: ratematn.c
 	@${CC} ${CFLAGS} -DDBG -o $@ $^ -lm
 
-# binary case, only two symbols ... and, DISCRETE VERSION
-bratematn: bratematn.c
+# binary case, only two symbols. CONTINUOUS case
 	@${CC} ${CFLAGS} -o $@ $^ -lm
 bratematn_d: bratematn.c
+	@${CC} ${CFLAGS} -DDBG -o $@ $^ -lm
+
+# binary, and, discrete rate case, only two symbols ... and, DISCRETE VERSION
+bdiscrate: bdiscrate.c
+	@${CC} ${CFLAGS} -o $@ $^ -lm
+bdiscrate_d: bdiscrate.c
 	@${CC} ${CFLAGS} -DDBG -o $@ $^ -lm
 
 # proto version
