@@ -3,7 +3,7 @@
 #
 CC=gcc
 CFLAGS=-g -Wall# -pg # note the gprof option
-EXES=ratematn ratematn_d bratematn bratematn_d
+EXES=ratematn ratematn_d bratematn bratematn_d discrate discrate_d waitimes
 SPECLIBS=-lcairo
 GSL_LIBS=-lgsl -lgslcblas -lm
 
@@ -32,6 +32,9 @@ ratematproto: ratematproto.c
 	@${CC} ${CFLAGS} -o $@ $^ -lm
 ratematproto_d: ratematproto.c
 	@${CC} ${CFLAGS} -DDBG -o $@ $^ -lm
+
+waitimes: waitimes.c
+	@${CC} ${CFLAGS} -o $@ $^ -lm
 
 .PHONY: clean
 

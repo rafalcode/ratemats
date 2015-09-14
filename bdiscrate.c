@@ -13,7 +13,7 @@
 #define GBUF 8
 #define WBUF 8
 
-#define HCNSTATES 2
+#define HCNSTATES 2 /* Hard coded number of states */
 
 typedef unsigned char boole;
 
@@ -65,7 +65,7 @@ r_t *fill_rt(char *s1, char *s2)
 
     /* first string */
     tstr=strchr(s1, '/');
-    if(!tstr) {
+    if(tstr==NULL) {
         rts->s1r=atof(s1);
         if(rts->s1r<min)
             min=rts->s1r;
@@ -80,7 +80,7 @@ r_t *fill_rt(char *s1, char *s2)
 
     /* second string */
     tstr=strchr(s2, '/');
-    if(!tstr) {
+    if(tstr==NULL) {
         rts->s2r=atof(s2);
         if(rts->s2r<min)
             min=rts->s2r;
@@ -176,16 +176,16 @@ void sitesubproc(sitedef* sites, r_t *rts, int nstates, int numsites, char symb,
             ura= (float)rand()/(1.+RAND_MAX);
             currba = sites[i].brec[sites[i].currp];
             if(currba==A) {
-                sites[i].brec[sites[i].currp + 1] = B;
                 srate=rts->s1r;
+                sites[i].brec[sites[i].currp + 1] = B;
             } else {
-                sites[i].brec[sites[i].currp + 1] = A;
                 srate=rts->s2r;
+                sites[i].brec[sites[i].currp + 1] = A;
             }
 #ifdef DBG
             printf("%.4f\n", srate); 
 #endif
-            sites[i].posarr[sites[i].currp + 1] = sites[i].posarr[sites[i].currp] + (unsigned)(.5-1.0/srate)*log1p(-ura); 
+            sites[i].posarr[sites[i].currp + 1] = sites[i].posarr[sites[i].currp] + (unsigned)((.5-1.0/srate)*log1p(-ura));
 
             sites[i].mxdisp = sites[i].posarr[sites[i].currp + 1];
 
