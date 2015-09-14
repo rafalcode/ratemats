@@ -33,7 +33,6 @@ typedef struct /* our definition of a site is a struct */
 {
     int currp; /* curr num of jumps: also uses as index to posarr[], i.e. gives the size of posarr */
     int jbf; /* buffer allow for jumps */
-    unsigned mxdisp; /* current maximum displacement */
     unsigned *posarr; /* the array of position values: to be a cumulative */
     base *brec; /* the array of past and current bases: one less than total of posarr */
     char starsymb; /* the starting symbol (character) */
@@ -94,9 +93,10 @@ r_t *fill_rt(char *s1, char *s2)
     }
 
     int mxt2=(int)(.5+1./min);
-    if( d1 & d2)
+    if( (d1!=0) & (d2 !=0) )
+    // if( (d1) & (d2) ) // can't explain why this won't work
         rts->mxt=(d1>d2)? d1:d2;
-    else if( (d1 & (d2==0) ) | (d2 & (d1==0) ) ) {
+    else if( ((d1!=0) & (d2==0)) | ((d2!=0) & (d1==0)) ) {
         if(rts->mxt < mxt2)
             rts->mxt = mxt2;
     } else
@@ -110,7 +110,6 @@ sitedef *crea_sd(int numsites)
     int i;
     sitedef *sitearr=malloc(sizeof(sitedef) * numsites);
     for(i=0;i<numsites;++i) {
-        sitearr[i].mxdisp=0.0;
         sitearr[i].currp=0;
         sitearr[i].jbf=BUF;
         sitearr[i].posarr=calloc(sizeof(float), sitearr[i].jbf);
@@ -187,8 +186,6 @@ void sitesubproc(sitedef* sites, r_t *rts, int nstates, int numsites, char symb,
 #endif
             sites[i].posarr[sites[i].currp + 1] = sites[i].posarr[sites[i].currp] + (unsigned)((.5-1.0/srate)*log1p(-ura));
 
-            sites[i].mxdisp = sites[i].posarr[sites[i].currp + 1];
-
             sites[i].currp++;
             /* check posarr buf sz */
             if(sites[i].currp==sites[i].jbf-1) {
@@ -199,7 +196,7 @@ void sitesubproc(sitedef* sites, r_t *rts, int nstates, int numsites, char symb,
                 memset(sites[i].brec+sites[i].jbf-BUF, 0, BUF*sizeof(base));
             }
             /*  breaking out when condition met */
-            if(sites[i].mxdisp >= lenc)
+            if(sites[i].posarr[sites[i].currp] >= lenc)
                 break; /*  this site has now crossed finishing line, go to next site*/
         }
         /*  rationalise posarr array size here */
@@ -232,11 +229,12 @@ int main(int argc, char *argv[])
 
     int nstates=HCNSTATES;
     r_t *rts=fill_rt(argv[1], argv[2]);
-#ifdef DBG
-    printf("rts: %.4f %.4f %d\n", rts->s1r, rts->s2r, rts->mxt); 
-#endif
     int numsites=atoi(argv[3]);
     int lenc=atoi(argv[4])*rts->mxt;
+#ifdef DBG
+    printf("rts: %.4f %.4f %d\n", rts->s1r, rts->s2r, rts->mxt); 
+    printf("numsites: %d lenc: %d\n", numsites, lenc);
+#endif
 
     sitedef *sitearr=crea_sd(numsites);
     sitesubproc(sitearr, rts, nstates, numsites, 'A', lenc, rsee);

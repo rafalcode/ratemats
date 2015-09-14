@@ -47,27 +47,32 @@ int main(int argc, char *argv[])
 
     float *erfa=nxta(rateparam, rfa, nsteps);
 
+    printf("Random numbers drawn:\n"); 
     for(i=0;i<nsteps;++i) /* random numbers */
-        printf("%.4f ", rfa[i]);
+        printf("%.3f ", rfa[i]);
     printf("\n"); 
     summit=.0;
+    printf("Conversion to expectation times:\n"); 
     for(i=0;i<nsteps;++i) /* waiting times */
         printf("%.3f ", erfa[i]);
     printf("\n"); 
+    printf("Cumulative expectation times:\n"); 
     for(i=0;i<nsteps;++i) { /* cumulative */
         summit += erfa[i];
         printf("%.3f ", summit);
     }
-    printf("\navg: %f\n", summit/(float)nsteps);
+    printf("\nAvg floating point waiting time: %f\n", summit/(float)nsteps);
     printf("Discrete version\n"); 
     for(i=0;i<nsteps;++i)
-        printf("%3d ", (int)erfa[i]);
+        printf("%3d ", (int)(.5+erfa[i]));
+        // printf("%3d ", (int)ceilf(erfa[i]));
     printf("\n"); 
     for(i=0;i<nsteps;++i) {
-        dsummit+=(int)erfa[i];
+        dsummit+=(int)(.5+erfa[i]);
+        // dsummit+=(int)ceilf(erfa[i]);
         printf("%3d ", dsummit);
     }
-    printf("\navg: %f\n", dsummit/(float)nsteps);
+    printf("\nAvg discrete waiting time: %f\n", dsummit/(float)nsteps);
 
     free(rfa);
     free(erfa);
