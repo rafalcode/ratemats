@@ -133,11 +133,12 @@ void summarysites(sitedef *sitearr, int numsites, int nstates, char *idstrng)
     float avgnj=.0;
     for(i=0;i<numsites;++i) {
         avgnj+=sitearr[i].currp-1; /* why -1? the first currp is not a change, it's the initial state */
-#ifdef DBG2
+#ifdef DBG
         int j;
         printf("site:%3d pos) ", i); 
-        for(j=0;j<sitearr[i].currp;++j) 
+        for(j=0;j<sitearr[i].currp;++j) {
             printf("%u ", sitearr[i].posarr[j]); 
+        }
         printf("\n"); 
 #endif
     }
@@ -181,10 +182,8 @@ void sitesubproc(sitedef* sites, r_t *rts, int nstates, int numsites, char symb,
                 srate=rts->s2r;
                 sites[i].brec[sites[i].currp + 1] = A;
             }
-#ifdef DBG
-            printf("%.4f\n", srate); 
-#endif
-            sites[i].posarr[sites[i].currp + 1] = sites[i].posarr[sites[i].currp] + (unsigned)((.5-1.0/srate)*log1p(-ura));
+            // sites[i].posarr[sites[i].currp + 1] = sites[i].posarr[sites[i].currp] + (unsigned)((.5-1.0/srate)*log1p(-ura));
+            sites[i].posarr[sites[i].currp + 1] = sites[i].posarr[sites[i].currp] + (unsigned)ceil((-1.0/srate)*log1p(-ura));
 
             sites[i].currp++;
             /* check posarr buf sz */
@@ -238,7 +237,7 @@ int main(int argc, char *argv[])
 
     sitedef *sitearr=crea_sd(numsites);
     sitesubproc(sitearr, rts, nstates, numsites, 'A', lenc, rsee);
-    summarysites(sitearr, numsites, nstates, "Final dist: -1/-rate log1p(-ura)");
+    summarysites(sitearr, numsites, nstates, "");
 
     for(i=0;i<numsites;++i) {
         free(sitearr[i].posarr);
